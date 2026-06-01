@@ -1,0 +1,704 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Global Situation Room</title>
+<!-- GLOBAL SITUATION ROOM v2 - data-backend edition
+     All intel served from local Python backend (data.json) - no browser CORS proxies.
+     Real FinMind Taiwan data with trend sparklines. Run start.bat to launch. -->
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#06080a; --panel:#0b0f13; --panel2:#0e141a;
+    --line:#1c2730; --line2:#2a3a47;
+    --txt:#c8d6df; --dim:#6f8694; --faint:#465863;
+    --cyan:#38e1ff; --green:#36f9b3; --amber:#ffb000; --red:#ff3b4e; --violet:#9b8cff;
+    --glow:0 0 14px;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:rgba(56,225,255,.18)}
+  html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
+  html,body{margin:0;height:100%}
+  body{-webkit-overflow-scrolling:touch}
+  body{
+    background:
+      radial-gradient(1200px 700px at 80% -10%, #0d1a22 0%, transparent 60%),
+      radial-gradient(900px 600px at -10% 110%, #160d12 0%, transparent 55%),
+      var(--bg);
+    color:var(--txt); font-family:"IBM Plex Mono",ui-monospace,monospace;
+    font-size:13px; line-height:1.45; background-attachment:fixed;
+  }
+  body::before{content:""; position:fixed; inset:0; pointer-events:none; z-index:999;
+    background:repeating-linear-gradient(0deg, rgba(255,255,255,.018) 0 1px, transparent 1px 3px); mix-blend-mode:overlay;}
+  .wrap{max-width:1680px; margin:0 auto;
+    padding:max(14px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) calc(64px + env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left));
+    position:relative; z-index:1}
+  .grid{display:grid;grid-template-columns:1fr;gap:14px;margin-top:14px}
+  .col{display:flex;flex-direction:column;gap:14px;min-width:0}
+  @media(min-width:820px){ .grid{grid-template-columns:1.4fr 1fr} }   /* iPad portrait & up: 2 columns */
+  @media(min-width:1080px){ .grid{grid-template-columns:1.45fr 1fr} }
+  @media(min-width:1700px){ .grid{grid-template-columns:1.4fr .95fr .95fr} }
+  @media(min-width:2200px){ .wrap{max-width:none;padding:18px 26px 64px}
+    .grid{grid-template-columns:1.5fr 1fr 1fr;gap:18px} body{font-size:15px}
+    .brand h1{font-size:26px} .clk .t{font-size:19px} .clk{min-width:104px} }
+  /* ---- iPad / touch tuning: bigger tap targets on coarse pointers ---- */
+  @media (pointer:coarse){
+    button{min-height:40px;padding:9px 14px;font-size:12.5px}
+    .prefresh{min-height:34px;min-width:34px;font-size:14px;padding:4px 9px}
+    .qmag{min-height:34px;padding:6px 12px}
+    .lview,.govlink{padding:11px 14px;font-size:12.5px}
+    .chan{padding:14px 13px}
+    .go{padding:8px 12px}
+    .clk{min-width:96px;padding:7px 10px}
+    .quake{padding:11px 0}
+    .gov-row{padding:11px 4px}
+  }
+  /* ---- very narrow (foldable cover screen, small phones) ---- */
+  @media(max-width:380px){
+    .brand{min-width:0} .brand h1{font-size:17px}
+    .taiex .big{font-size:24px}
+    .clk{min-width:74px;padding:4px 7px} .clk .t{font-size:13px}
+    .chips{grid-template-columns:repeat(2,1fr)}
+  }
+  h1,h2,h3,.disp{font-family:"Chakra Petch",sans-serif; letter-spacing:.04em}
+
+  header{display:flex; align-items:center; gap:18px; flex-wrap:wrap;
+    border:1px solid var(--line2); border-radius:10px;
+    background:linear-gradient(180deg,#0c141a,#080c10); padding:12px 16px; position:relative; overflow:hidden;}
+  header::after{content:"";position:absolute;left:0;right:0;bottom:0;height:1px;
+    background:linear-gradient(90deg,transparent,var(--cyan),transparent);opacity:.5}
+  .brand{display:flex;align-items:center;gap:12px;min-width:260px}
+  .reticle{width:34px;height:34px;border:2px solid var(--cyan);border-radius:50%;position:relative;
+    box-shadow:var(--glow) rgba(56,225,255,.45) inset, var(--glow) rgba(56,225,255,.25)}
+  .reticle::before,.reticle::after{content:"";position:absolute;background:var(--cyan)}
+  .reticle::before{left:50%;top:-6px;bottom:-6px;width:1px;transform:translateX(-50%)}
+  .reticle::after{top:50%;left:-6px;right:-6px;height:1px;transform:translateY(-50%)}
+  .brand h1{margin:0;font-size:20px;font-weight:700;color:#eaf6fb}
+  .brand .sub{font-size:10.5px;color:var(--dim);letter-spacing:.22em;text-transform:uppercase}
+
+  .threat{display:flex;align-items:center;gap:10px;padding:6px 14px;border-radius:8px;border:1px solid var(--line2);background:#0a1014}
+  .threat .lvl{font-family:"Chakra Petch";font-weight:700;font-size:18px}
+  .threat .lab{font-size:9.5px;color:var(--dim);letter-spacing:.18em}
+  .led{width:9px;height:9px;border-radius:50%;display:inline-block}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.25}}
+  .blink{animation:pulse 1.6s infinite}
+
+  .datapill{display:flex;align-items:center;gap:8px;padding:6px 12px;border-radius:8px;
+    border:1px solid var(--line2);background:#0a1014;font-size:10px}
+  .datapill .lab{color:var(--dim);letter-spacing:.14em}
+  .datapill .age{font-family:"Chakra Petch";font-weight:700;font-size:13px;color:var(--green)}
+  .datapill.stale .age{color:var(--red)} .datapill.stale{border-color:#5a1620}
+
+  .clocks{display:flex;gap:10px;margin-left:auto;flex-wrap:wrap}
+  .clk{min-width:88px;text-align:center;border:1px solid var(--line);border-radius:7px;padding:5px 9px;background:#090d11}
+  .clk .z{font-size:9px;color:var(--dim);letter-spacing:.14em}
+  .clk .t{font-size:15px;color:var(--green);font-weight:600;text-shadow:var(--glow) rgba(54,249,179,.35)}
+  .clk.home{border-color:#2a4a3f} .clk .d{font-size:8.5px;color:var(--faint)}
+
+  .panel{border:1px solid var(--line);border-radius:10px;background:linear-gradient(180deg,var(--panel2),var(--panel));overflow:hidden}
+  .phead{display:flex;align-items:center;gap:9px;padding:9px 12px;border-bottom:1px solid var(--line);background:#0a1014}
+  .phead .dot{width:7px;height:7px;border-radius:50%}
+  .phead h2{margin:0;font-size:12.5px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:#dceaf1}
+  .phead .meta{margin-left:auto;font-size:9.5px;color:var(--faint);display:flex;gap:10px;align-items:center}
+  .pbody{padding:12px}
+
+  button{font-family:"IBM Plex Mono";cursor:pointer;background:#0e161c;color:var(--txt);-webkit-appearance:none;appearance:none;
+    border:1px solid var(--line2);border-radius:6px;padding:5px 10px;font-size:11px;transition:.15s}
+  button:hover{border-color:var(--cyan);color:#eaf6fb;box-shadow:var(--glow) rgba(56,225,255,.2)}
+  button.act{border-color:var(--cyan);color:var(--cyan)} .ic{font-size:12px}
+  /* per-panel refresh button */
+  .prefresh{font-family:"IBM Plex Mono";font-size:12px;line-height:1;padding:2px 6px;border-radius:5px;
+    border:1px solid var(--line2);background:#0e161c;color:var(--dim);cursor:pointer;display:inline-block}
+  .prefresh:hover{border-color:var(--cyan);color:var(--cyan);box-shadow:var(--glow) rgba(56,225,255,.18)}
+  .prefresh.spin{animation:spin360 .7s linear}
+  @keyframes spin360{to{transform:rotate(360deg)}}
+  /* verified channel states */
+  .chan.off{opacity:.62} .chan.off .cled{background:var(--faint)!important;box-shadow:none!important}
+  .chan.off .cl{color:var(--faint)!important}
+  .chan.soon .cled{background:var(--amber)!important;box-shadow:var(--glow) var(--amber)!important}
+  .chan.soon .cl{color:var(--amber)!important}
+  .chan.unknown .cled{background:var(--dim)!important;box-shadow:none!important} .chan.unknown .cl{color:var(--dim)!important}
+  .delaytag{font-size:8.5px;color:#1a1206;background:var(--amber);border-radius:4px;padding:1px 5px;margin-left:7px;font-weight:700;letter-spacing:.03em;vertical-align:middle}
+
+  /* ---- TAIWAN MARKET BOARD (the transmission lens) ---- */
+  .taiex{display:flex;align-items:center;gap:14px;padding:10px 12px;border:1px solid var(--line2);
+    border-radius:9px;background:linear-gradient(180deg,#08140f,#070d0b);margin-bottom:12px}
+  .taiex .big{font-family:"Chakra Petch";font-weight:700;font-size:30px;color:#eaf6fb;line-height:1}
+  .taiex .nm{font-size:10px;color:var(--dim);letter-spacing:.12em}
+  .taiex .chg{font-family:"Chakra Petch";font-weight:700;font-size:17px}
+  .taiex .sp{margin-left:auto}
+  .stk{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+  @media(min-width:560px){.stk{grid-template-columns:repeat(3,1fr)}}
+  @media(min-width:1080px){.stk{grid-template-columns:repeat(2,1fr)}}
+  @media(min-width:1700px){.stk{grid-template-columns:repeat(3,1fr)}}
+  .scard{border:1px solid var(--line2);border-radius:8px;padding:8px 9px;background:#080d11;position:relative;overflow:hidden}
+  .scard .top{display:flex;justify-content:space-between;align-items:baseline;gap:6px}
+  .scard .nm{font-size:10px;color:#cfe0e8;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .scard .id{font-size:8.5px;color:var(--faint)}
+  .scard .pr{font-family:"Chakra Petch";font-weight:600;font-size:16px;color:#eaf6fb;margin-top:3px}
+  .scard .ch{font-size:11px;font-weight:600}
+  .scard .spwrap{margin-top:5px;height:26px}
+  .tagdot{position:absolute;top:8px;right:8px;width:6px;height:6px;border-radius:50%}
+  .tag-semi{background:var(--cyan)} .tag-ship{background:var(--violet)} .tag-air{background:var(--amber)} .tag-chem{background:var(--green)}
+  .up{color:var(--green)} .dn{color:var(--red)} .fl{color:var(--dim)}
+
+  .chips{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+  @media(max-width:560px){.chips{grid-template-columns:repeat(2,1fr)}}
+  .chip{border:1px solid var(--line2);border-radius:8px;padding:8px 10px;background:#080d11}
+  .chip .n{font-size:9.5px;color:var(--dim);letter-spacing:.1em}
+  .chip .p{font-family:"Chakra Petch";font-size:17px;font-weight:600;color:#eaf6fb}
+  .chip .c{font-size:10.5px}
+  .chip .spwrap{margin-top:4px;height:20px}
+
+  .statline{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;margin-bottom:10px;
+    padding:9px 11px;border:1px solid var(--line2);border-radius:8px;background:#080e12}
+  .statline .k{font-size:9px;color:var(--dim);letter-spacing:.14em}
+  .statline .v{font-family:"Chakra Petch";font-weight:600}
+  .feed{display:flex;flex-direction:column;gap:9px}
+  .item{border-left:2px solid var(--line2);padding:2px 0 2px 11px}
+  .item.hi{border-color:var(--red)} .item.md{border-color:var(--amber)} .item.lo{border-color:var(--green)}
+  .item .h{font-size:12px;color:#e7f2f7;font-weight:500;margin-bottom:2px}
+  .item .b{font-size:11px;color:var(--dim);line-height:1.5}
+  .item .src{font-size:9.5px;color:var(--faint);margin-top:3px;letter-spacing:.06em}
+  .imp{margin-top:10px;padding:10px 11px;border:1px dashed var(--line2);border-radius:8px;background:#0a0f0c}
+  .imp .lab{font-size:9.5px;color:var(--green);letter-spacing:.16em;margin-bottom:5px}
+  .imp p{margin:4px 0;font-size:11px;color:var(--txt)}
+
+  .skel{height:12px;border-radius:4px;background:linear-gradient(90deg,#0e161c,#16222b,#0e161c);
+    background-size:200% 100%;animation:sh 1.3s infinite}
+  @keyframes sh{0%{background-position:200% 0}100%{background-position:-200% 0}}
+  .err{font-size:11px;color:var(--amber);background:#1a1206;border:1px solid #3a2a08;border-radius:7px;padding:9px 11px}
+  .banner{display:none;margin:0 0 12px;padding:10px 14px;border:1px solid #5a1620;border-radius:9px;
+    background:#15090c;color:#ffd9df;font-size:11.5px;line-height:1.5}
+  .banner b{color:#fff} .banner code{background:#2a1014;padding:1px 6px;border-radius:4px;color:var(--amber)}
+
+  .ticker{position:fixed;left:0;right:0;bottom:0;height:calc(30px + env(safe-area-inset-bottom));padding-bottom:env(safe-area-inset-bottom);z-index:50;
+    background:linear-gradient(180deg,#0a1014,#06090c);border-top:1px solid var(--line2);display:flex;align-items:center;overflow:hidden}
+  .ticker .badge{background:var(--red);color:#fff;font-family:"Chakra Petch";font-weight:700;font-size:11px;
+    letter-spacing:.1em;padding:0 12px;height:100%;display:flex;align-items:center}
+  .tk-track{display:inline-flex;white-space:nowrap;animation:scroll 60s linear infinite;padding-left:100%}
+  .tk-track span{padding:0 26px;font-size:11.5px;color:var(--txt)} .tk-track b{color:var(--amber)}
+  @keyframes scroll{0%{transform:translateX(0)}100%{transform:translateX(-100%)}}
+  .ticker:hover .tk-track{animation-play-state:paused}
+
+  .foot{display:flex;gap:14px;align-items:center;margin-top:12px;font-size:10px;color:var(--faint)}
+  a{color:var(--cyan);text-decoration:none}
+
+  .chanlab{font-size:9.5px;letter-spacing:.16em;color:var(--dim);margin-bottom:7px}
+  .chgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+  .chan{position:relative;display:flex;align-items:center;gap:9px;padding:11px 12px;border:1px solid var(--line2);
+    border-radius:9px;background:linear-gradient(180deg,#0d141a,#0a0e12);color:var(--txt);transition:.15s;overflow:hidden}
+  .chan:hover{border-color:var(--cyan);box-shadow:var(--glow) rgba(56,225,255,.2);transform:translateY(-1px)}
+  .chan .cled{width:8px;height:8px;border-radius:50%;background:var(--red);flex:none;box-shadow:var(--glow) var(--red)}
+  .chan.gov .cled{background:var(--amber);box-shadow:var(--glow) var(--amber)}
+  .chan .cn{font-family:"Chakra Petch";font-weight:600;font-size:13px;color:#eaf6fb;line-height:1.1}
+  .chan .cl{font-size:8.5px;color:var(--red);letter-spacing:.12em;margin-top:2px}
+  .chan.gov .cl{color:var(--amber)}
+  .chan .arr{margin-left:auto;color:var(--faint);font-size:13px} .chan:hover .arr{color:var(--cyan)}
+  .govlink{font-size:10px;color:var(--amber);border:1px dashed #5a4410;border-radius:6px;padding:4px 8px}
+  .govlink:hover{border-style:solid}
+
+  .mapbox{position:relative;min-height:300px;background:radial-gradient(600px 300px at 50% 40%, #0c1820, #06090c);
+    display:flex;align-items:center;justify-content:center;overflow:hidden}
+  .maplink{z-index:1;text-align:center;color:var(--cyan);font-family:"Chakra Petch";font-weight:600;font-size:15px;
+    letter-spacing:.04em;padding:18px 26px;border:1px solid var(--line2);border-radius:10px;background:rgba(0,0,0,.35)}
+  .maplink small{display:block;margin-top:8px;font-family:"IBM Plex Mono";font-weight:400;font-size:10px;color:var(--dim);letter-spacing:0}
+  .maplink:hover{border-color:var(--cyan);box-shadow:var(--glow) rgba(56,225,255,.25)}
+  .charts{display:grid;grid-template-columns:1fr;gap:8px;padding:8px}
+  @media(min-width:620px){ .charts{grid-template-columns:1fr 1fr} }
+  .chartwrap{position:relative;border:1px solid var(--line2);border-radius:8px;overflow:hidden;background:#080d11}
+  .chartwrap .clab{font-size:9.5px;letter-spacing:.12em;color:var(--amber);padding:5px 8px;border-bottom:1px solid var(--line)}
+  .chartwrap iframe{width:100%;height:260px;border:0;display:block}
+  .lview{font-size:11.5px;padding:8px 12px;border:1px solid var(--line2);border-radius:8px;background:#0b1116;color:var(--txt);transition:.15s;display:inline-block;margin:2px}
+  .lview:hover{border-color:var(--cyan);color:#eaf6fb;box-shadow:var(--glow) rgba(56,225,255,.18)}
+  .idxtape{display:grid;grid-template-columns:1fr;gap:8px}
+  @media(min-width:520px){ .idxtape{grid-template-columns:1fr 1fr} }
+  .idxwrap{position:relative;border:1px solid var(--line2);border-radius:8px;overflow:hidden;background:#080d11}
+  .idxwrap .clab{font-size:9px;letter-spacing:.1em;color:var(--dim);padding:5px 8px;border-bottom:1px solid var(--line)}
+  .idxwrap iframe{width:100%;height:190px;border:0;display:block}
+
+  .qctl{display:flex;align-items:center;gap:6px;margin-bottom:9px}
+  .qmag{font-size:10px;padding:3px 9px}
+  .quake{display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--line)}
+  .quake:last-child{border-bottom:0}
+  .quake .qm{font-family:"Chakra Petch";font-weight:700;font-size:16px;min-width:46px;text-align:center;border-radius:6px;padding:3px 0}
+  .quake .qx{flex:1;min-width:0} .quake .qp{font-size:12px;color:#e7f2f7;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .quake .qt{font-size:10px;color:var(--dim)} .quake .qbadge{font-size:9px;padding:2px 6px;border-radius:4px;letter-spacing:.08em;flex:none}
+  .qm-lo{background:#10331f;color:var(--green)} .qm-md{background:#33280a;color:var(--amber)} .qm-hi{background:#3a1116;color:var(--red)}
+  .tsunami{background:var(--red);color:#fff}
+
+  .warbtn{font-family:"Chakra Petch";font-weight:700;letter-spacing:.1em;font-size:12px;border-color:#3a5a52;color:var(--green);padding:8px 14px}
+  .warbtn:hover{border-color:var(--green);box-shadow:var(--glow) rgba(54,249,179,.3);color:#dffff2}
+
+  .gov-row{display:flex;align-items:center;gap:11px;padding:9px 4px;border-bottom:1px solid var(--line)}
+  .gov-row:last-child{border-bottom:0}
+  .gov-row .gled{width:11px;height:11px;border-radius:50%;flex:none}
+  .gov-row .nm{font-family:"Chakra Petch";font-weight:600;font-size:13px;color:#eaf6fb;min-width:118px}
+  .gov-row .st{font-family:"Chakra Petch";font-weight:700;font-size:12px;letter-spacing:.08em;min-width:74px}
+  .gov-row .nt{font-size:10.5px;color:var(--dim);flex:1;line-height:1.4}
+  .gov-row .go{font-size:10px;padding:3px 8px;flex:none}
+  .st-live{color:var(--red)} .st-soon{color:var(--amber)} .st-off{color:var(--faint)}
+
+  .radar{position:fixed;right:-160px;top:-160px;width:520px;height:520px;border-radius:50%;pointer-events:none;z-index:0;opacity:.10;
+    background:conic-gradient(from 0deg, transparent 0deg, rgba(56,225,255,.0) 300deg, rgba(56,225,255,.9) 360deg);animation:sweep 7s linear infinite}
+  .radar::after{content:"";position:absolute;inset:0;border-radius:50%;
+    background:repeating-radial-gradient(circle, transparent 0 38px, rgba(56,225,255,.10) 38px 39px)}
+  @keyframes sweep{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+<div class="radar"></div>
+<div class="wrap">
+  <header>
+    <div class="brand">
+      <div class="reticle"></div>
+      <div><h1>GLOBAL SITUATION ROOM</h1><div class="sub">Geopolitical Watch · Taiwan Market-Impact Lens</div></div>
+    </div>
+    <div class="threat" id="threatBox" title="Computed live from oil move + VIX + security alerts + seismic">
+      <span class="led blink" id="threatLed" style="background:var(--amber);box-shadow:var(--glow) var(--amber)"></span>
+      <div><div class="lvl" id="threatLvl" style="color:var(--amber)">ELEVATED</div><div class="lab" id="threatLab">HORMUZ / GLOBAL</div></div>
+    </div>
+    <div class="datapill" id="dataPill" title="Age of the data served by your local backend">
+      <span class="lab">DATA</span><span class="age" id="dataAge">--</span>
+    </div>
+    <button id="alertBtn" class="warbtn" title="Sound + desktop notification on escalations">🔔 ALERTS: OFF</button>
+    <button id="warRoomBtn" class="warbtn">⛶ WAR ROOM</button>
+    <div class="clocks" id="clocks"></div>
+  </header>
+
+  <div class="banner" id="backendBanner">
+    <b>⚠ Backend not detected.</b> You're viewing the page directly (file://) or the data service isn't running, so intel is frozen seed data.
+    To go live, close this and double-click <code>start.bat</code> — it launches the data backend and reopens this page at <code>localhost:8800</code>.
+  </div>
+
+  <div class="grid">
+    <!-- COLUMN A -->
+    <div class="col">
+      <div class="panel">
+        <div class="phead"><span class="dot blink" style="background:var(--red);box-shadow:var(--glow) var(--red)"></span>
+          <h2>Live Channels</h2><div class="meta"><span id="chanStamp">status unverified</span><button class="prefresh" title="Re-check live status">⟳</button></div></div>
+        <div class="pbody">
+          <div class="chanlab">NEWS · 24/7</div><div class="chgrid" id="chanNews"></div>
+          <div class="chanlab" style="color:var(--amber);margin-top:12px">GOV / DEFENSE</div><div class="chgrid" id="chanGov"></div>
+          <div style="margin-top:10px">
+            <a class="govlink" href="https://www.whitehouse.gov/live/" target="_blank" rel="noopener">whitehouse.gov/live ↗</a>
+            <a class="govlink" href="https://www.war.gov/News/Live-Events/" target="_blank" rel="noopener">war.gov live ↗</a>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="phead"><span class="dot blink" style="background:var(--red);box-shadow:var(--glow) var(--red)"></span>
+          <h2>◬ Situation Map · Strait of Hormuz <span style="color:var(--faint);font-weight:400">(LIVE AIS)</span></h2>
+          <div class="meta"><a class="go" href="https://www.shiptraffic.net/military/HORMUZ%20STRAIT/ship-traffic-tracker" target="_blank" rel="noopener">full map ↗</a></div></div>
+        <div class="mapbox" id="aisMount">
+          <a class="maplink" href="https://www.shiptraffic.net/military/HORMUZ%20STRAIT/ship-traffic-tracker" target="_blank" rel="noopener">
+            ▶ LIVE TANKER MAP · STRAIT OF HORMUZ ↗
+            <small>live AIS vessel map renders here · click to open full tracker</small></a>
+          <script type="text/javascript">var width="100%"; var height="320"; var latitude="26.55"; var longitude="56.45"; var zoom="8"; var names=true;</script>
+          <script type="text/javascript" src="https://www.vesselfinder.com/aismap.js"></script>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="phead"><span class="dot" style="background:var(--violet);box-shadow:var(--glow) var(--violet)"></span>
+          <h2>◴ Disaster Monitor · Quakes &amp; Hazards</h2>
+          <div class="meta"><span id="quakeStamp">--</span><button class="prefresh" title="Refresh now">⟳</button></div></div>
+        <div class="pbody">
+          <div class="qctl"><span style="font-size:9.5px;color:var(--dim)">MIN MAG</span>
+            <button class="qmag" data-m="2.5">2.5+</button><button class="qmag act" data-m="4.5">4.5+</button><button class="qmag" data-m="6">6.0+</button>
+            <span style="font-size:9.5px;color:var(--faint);margin-left:auto">USGS · live</span></div>
+          <div class="feed" id="quakeFeed"></div>
+          <div style="margin-top:10px">
+            <a class="lview" href="https://earthquake.usgs.gov/earthquakes/map/" target="_blank" rel="noopener">🌐 USGS Map ↗</a>
+            <a class="lview" href="https://www.gdacs.org/" target="_blank" rel="noopener">🌀 GDACS ↗</a>
+            <a class="lview" href="https://www.tsunami.gov/" target="_blank" rel="noopener">🌊 Tsunami ↗</a>
+            <a class="lview" href="https://www.volcanodiscovery.com/earthquakes/taiwan.html" target="_blank" rel="noopener">🇹🇼 Taiwan ↗</a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- COLUMN B -->
+    <div class="col">
+      <!-- TAIWAN MARKET BOARD -->
+      <div class="panel" style="border-color:#2a4a3f">
+        <div class="phead" style="background:#0a130f"><span class="dot" style="background:var(--green);box-shadow:var(--glow) var(--green)"></span>
+          <h2 style="color:#cdeee0">加權指數 · Taiwan Market Board</h2>
+          <div class="meta"><span style="color:var(--green)">FinMind / TWSE</span><span id="twStamp">--</span><button class="prefresh" title="Refresh now">⟳</button></div></div>
+        <div class="pbody"><div id="twBody"></div></div>
+      </div>
+
+      <div class="panel" style="border-color:#4a3a14">
+        <div class="phead" style="background:#13100a"><span class="dot" style="background:var(--amber);box-shadow:var(--glow) var(--amber)"></span>
+          <h2 style="color:#ffe9bd">◉ OFFICIAL FEEDS · LIVE NOW?</h2><div class="meta"><span id="govStamp">--</span><button class="prefresh" title="Refresh now">⟳</button></div></div>
+        <div class="pbody"><div id="govBody"></div></div>
+      </div>
+
+      <div class="panel" style="border-color:#3a2230">
+        <div class="phead" style="background:#140a0e"><span class="dot blink" style="background:var(--red);box-shadow:var(--glow) var(--red)"></span>
+          <h2 style="color:#ffd9df">◢ PRIORITY · IRAN / STRAIT OF HORMUZ</h2><div class="meta"><span id="hzStamp">--</span><button class="prefresh" title="Refresh now">⟳</button></div></div>
+        <div class="pbody"><div class="feed" id="hzFeed"></div>
+          <div class="imp" id="hzImp"><div class="lab">▌ ANALYST READ</div><div id="hzImpBody"></div></div></div>
+      </div>
+
+      <div class="panel">
+        <div class="phead"><span class="dot" style="background:var(--violet)"></span><h2>Console</h2></div>
+        <div class="pbody" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+          <button id="refreshAll" class="act"><span class="ic">⟳</span> REFRESH INTEL</button>
+          <button id="autoBtn">AUTO-REFRESH: OFF</button>
+          <button id="scanBtn" class="warbtn" style="padding:6px 12px;font-size:11px">📋 SCAN → SNAPSHOT</button>
+          <span id="scanStatus" style="font-size:10px;color:var(--faint)">snapshot saves a brief + JSON</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- COLUMN C -->
+    <div class="col">
+      <div class="panel">
+        <div class="phead"><span class="dot" style="background:var(--green);box-shadow:var(--glow) var(--green)"></span>
+          <h2>Energy &amp; Market Impact</h2><div class="meta"><span id="mktStamp">--</span><button class="prefresh" title="Refresh now">⟳</button></div></div>
+        <div class="pbody"><div class="chips" id="chips"></div>
+          <div class="imp" id="mktImp" style="margin-top:12px"><div class="lab">▌ TRANSMISSION → TAIWAN &amp; US EQUITIES</div><div id="mktImpBody"></div></div></div>
+      </div>
+
+      <div class="panel">
+        <div class="phead"><span class="dot" style="background:var(--cyan);box-shadow:var(--glow) var(--cyan)"></span>
+          <h2>Global Wire · Market Movers</h2><div class="meta"><span id="wireStamp">--</span><button class="prefresh" title="Refresh now">⟳</button></div></div>
+        <div class="pbody"><div class="feed" id="wireFeed"></div></div>
+      </div>
+
+      <div class="panel">
+        <div class="phead"><span class="dot" style="background:var(--green);box-shadow:var(--glow) var(--green)"></span>
+          <h2>Live Charts · TAIEX / ES / SOX / VIX</h2><div class="meta"><span>TradingView</span></div></div>
+        <div class="pbody"><div class="idxtape">
+          <div class="idxwrap" style="grid-column:1 / -1"><div class="clab" style="color:var(--green)">加權指數 · TAIEX (TWSE:IX0001)</div>
+            <iframe title="TAIEX" loading="lazy" src="https://s.tradingview.com/widgetembed/?symbol=TWSE%3AIX0001&interval=60&theme=dark&style=1&locale=en&hideideas=1&hidesidetoolbar=1&saveimage=0&withdateranges=0&hidetoptoolbar=1"></iframe></div>
+          <div class="idxwrap"><div class="clab">S&amp;P 500 FUT · ES</div>
+            <iframe title="ES" loading="lazy" src="https://s.tradingview.com/widgetembed/?symbol=CME_MINI%3AES1!&interval=60&theme=dark&style=1&locale=en&hideideas=1&hidesidetoolbar=1&saveimage=0&hidetoptoolbar=1"></iframe></div>
+          <div class="idxwrap"><div class="clab">SOX · SEMIS</div>
+            <iframe title="SOX" loading="lazy" src="https://s.tradingview.com/widgetembed/?symbol=NASDAQ%3ASOX&interval=60&theme=dark&style=1&locale=en&hideideas=1&hidesidetoolbar=1&saveimage=0&hidetoptoolbar=1"></iframe></div>
+          <div class="idxwrap"><div class="clab" style="color:var(--red)">VIX · FEAR</div>
+            <iframe title="VIX" loading="lazy" src="https://s.tradingview.com/widgetembed/?symbol=CBOE%3AVIX&interval=60&theme=dark&style=1&locale=en&hideideas=1&hidesidetoolbar=1&saveimage=0&hidetoptoolbar=1"></iframe></div>
+        </div></div>
+      </div>
+
+      <div class="panel">
+        <div class="phead"><span class="dot" style="background:var(--amber);box-shadow:var(--glow) var(--amber)"></span>
+          <h2>Live Oil · Brent &amp; WTI</h2><div class="meta"><span>chokepoint barometer</span></div></div>
+        <div class="charts">
+          <div class="chartwrap"><div class="clab">BRENT · UKOIL</div>
+            <iframe title="Brent" loading="lazy" src="https://s.tradingview.com/widgetembed/?symbol=TVC%3AUKOIL&interval=60&theme=dark&style=1&locale=en&hideideas=1&hidesidetoolbar=1&saveimage=0&hidetoptoolbar=0"></iframe></div>
+          <div class="chartwrap"><div class="clab">WTI · USOIL</div>
+            <iframe title="WTI" loading="lazy" src="https://s.tradingview.com/widgetembed/?symbol=TVC%3AUSOIL&interval=60&theme=dark&style=1&locale=en&hideideas=1&hidesidetoolbar=1&saveimage=0&hidetoptoolbar=0"></iframe></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel" style="margin-top:14px">
+    <div class="phead"><span class="dot" style="background:var(--cyan);box-shadow:var(--glow) var(--cyan)"></span>
+      <h2>Live Views · Iran / Hormuz Theatre</h2><div class="meta"><span>open in new tab · keyless</span></div></div>
+    <div class="pbody" style="display:flex;gap:6px;flex-wrap:wrap">
+      <a class="lview" href="https://www.shiptraffic.net/military/HORMUZ%20STRAIT/ship-traffic-tracker" target="_blank" rel="noopener">🚢 Hormuz Ship Traffic</a>
+      <a class="lview" href="https://www.marinetraffic.com/en/ais/home/centerx:56.4/centery:26.5/zoom:8" target="_blank" rel="noopener">🛰 MarineTraffic</a>
+      <a class="lview" href="https://hormuzstraitmonitor.com/" target="_blank" rel="noopener">📊 Hormuz Monitor</a>
+      <a class="lview" href="https://www.flightradar24.com/26.5,56.4/7" target="_blank" rel="noopener">✈ Flightradar24</a>
+      <a class="lview" href="https://iran.liveuamap.com/" target="_blank" rel="noopener">🗺 LiveUAMap</a>
+      <a class="lview" href="https://www.windy.com/?26.5,56.4,7" target="_blank" rel="noopener">🌊 Windy · Gulf</a>
+    </div>
+  </div>
+
+  <div class="foot"><span>◉ SESSION ACTIVE</span><span id="footStamp"></span>
+    <span style="margin-left:auto">Intel from local backend (FinMind · Stooq · USGS · Google News) · verify before acting on positions</span></div>
+</div>
+
+<div class="ticker"><div class="badge">● LIVE</div><div style="flex:1;overflow:hidden"><div class="tk-track" id="tkTrack"></div></div></div>
+
+<script src="data.js"></script>
+<script>
+/* ========== MULTI-ZONE CLOCKS ========== */
+const ZONES=[{z:"TAIPEI",tz:"Asia/Taipei",home:true},{z:"NEW YORK",tz:"America/New_York"},
+  {z:"LONDON",tz:"Europe/London"},{z:"DUBAI",tz:"Asia/Dubai"},{z:"TEHRAN",tz:"Asia/Tehran"}];
+function drawClocks(){
+  const now=new Date();
+  document.getElementById("clocks").innerHTML=ZONES.map(o=>{
+    const t=new Intl.DateTimeFormat("en-GB",{hour:"2-digit",minute:"2-digit",second:"2-digit",hour12:false,timeZone:o.tz}).format(now);
+    const d=new Intl.DateTimeFormat("en-GB",{weekday:"short",day:"2-digit",month:"short",timeZone:o.tz}).format(now);
+    return `<div class="clk ${o.home?'home':''}"><div class="z">${o.z}${o.home?' ◆':''}</div><div class="t">${t}</div><div class="d">${d}</div></div>`;
+  }).join("");
+  document.getElementById("footStamp").textContent="LAST TICK · "+new Intl.DateTimeFormat("en-GB",{hour:"2-digit",minute:"2-digit",second:"2-digit",timeZone:"Asia/Taipei"}).format(now)+" TPE";
+}
+drawClocks(); setInterval(drawClocks,1000);
+
+/* ========== LIVE CHANNELS ========== */
+const CHANNELS=[
+  {name:"Al Jazeera",h:"aljazeeraenglish",g:"news"},{name:"ABC News 24/7",h:"ABCNews",g:"news"},
+  {name:"DW News",h:"dwnews",g:"news"},{name:"France 24",h:"FRANCE24English",g:"news"},
+  {name:"Sky News",h:"SkyNews",g:"news"},{name:"Bloomberg TV",h:"markets",g:"news"},
+  {name:"CNN",h:"CNN",g:"news"},{name:"White House",h:"WhiteHouse",g:"gov"},
+  {name:"Pentagon / War Dept",h:"DeptofDefense",g:"gov"}];
+const CHAN_LAB={live:"● LIVE · WATCH",soon:"◷ STARTING SOON",off:"○ OFFLINE",unknown:"↗ OPEN CHANNEL"};
+function chanCard(c){
+  const st=(DATA&&DATA.channels&&DATA.channels[c.h])||"unknown";
+  const blink=st==="live"?"blink":"";
+  return `<a class="chan ${c.g==='gov'?'gov':''} ${st}" href="https://www.youtube.com/@${c.h}/live" target="_blank" rel="noopener">
+  <span class="cled ${blink}"></span><span><span class="cn">${c.name}</span><br><span class="cl">${CHAN_LAB[st]}</span></span><span class="arr">↗</span></a>`;
+}
+function renderChannels(){
+  document.getElementById("chanNews").innerHTML=CHANNELS.filter(c=>c.g==="news").map(chanCard).join("");
+  document.getElementById("chanGov").innerHTML=CHANNELS.filter(c=>c.g==="gov").map(chanCard).join("");
+  const stamp=document.getElementById("chanStamp");
+  if(stamp){const cs=DATA&&DATA.channels;
+    if(!cs){stamp.textContent="status unverified";stamp.style.color="var(--faint)";}
+    else{const n=Object.values(cs).filter(v=>v==="live").length;stamp.textContent=n+" live now";stamp.style.color=n?"var(--red)":"var(--dim)";}}
+}
+
+/* ========== HELPERS ========== */
+function esc(s){return (s||"").replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+function ago(d){const t=new Date(d);if(isNaN(t))return "";let m=Math.round((Date.now()-t)/6e4);
+  if(m<1)return "just now";if(m<60)return m+"m ago";let h=Math.round(m/60);if(h<24)return h+"h ago";return Math.round(h/24)+"d ago";}
+// inline SVG sparkline from an array of numbers
+function spark(arr,w,h,up){
+  if(!arr||arr.length<2) return "";
+  w=w||90;h=h||26;const min=Math.min(...arr),max=Math.max(...arr),rng=(max-min)||1;
+  const pts=arr.map((v,i)=>[(i/(arr.length-1))*w, h-3-((v-min)/rng)*(h-6)]);
+  const d=pts.map((p,i)=>(i?"L":"M")+p[0].toFixed(1)+" "+p[1].toFixed(1)).join(" ");
+  const col=up>0?"#36f9b3":up<0?"#ff3b4e":"#6f8694";
+  const area=d+` L${w} ${h} L0 ${h} Z`;
+  return `<svg viewBox="0 0 ${w} ${h}" width="100%" height="${h}" preserveAspectRatio="none">
+    <path d="${area}" fill="${col}" opacity="0.10"/><path d="${d}" fill="none" stroke="${col}" stroke-width="1.4"/>
+    <circle cx="${pts[pts.length-1][0].toFixed(1)}" cy="${pts[pts.length-1][1].toFixed(1)}" r="1.8" fill="${col}"/></svg>`;
+}
+function chgCls(v){return v>0?"up":v<0?"dn":"fl";}
+function chgTxt(v){return (v>0?"▲ +":v<0?"▼ ":"")+ (v||0).toFixed(2)+"%";}
+
+/* ========== SEED (fallback only) ========== */
+const SEED={
+  generated_tpe:"seed", generated_epoch:0,
+  taiwan:{taiex:{close:44732.94,chg_pct:2.51,spark:[43644,43525,44256,43636,44732],date:"2026-05-29"},
+    stocks:[{id:"2330",name:"TSMC 台積電",tag:"semi",close:2355,chg_pct:2.61,spark:[2300,2295,2355]},
+            {id:"2317",name:"Hon Hai 鴻海",tag:"semi",close:289,chg_pct:1.2,spark:[285,287,289]}]},
+  markets:[{n:"BRENT",p:"$103.54",c:"+0.9%",d:"up",spark:[]},{n:"WTI",p:"$96.60",c:"+0.3%",d:"up",spark:[]},
+    {n:"S&P 500",p:"5400",c:"-0.4%",d:"dn",spark:[]},{n:"VIX",p:"22.0",c:"+1.2%",d:"up",spark:[]},{n:"USD/TWD",p:"31.5",c:"flat",d:"fl",spark:[]}],
+  signals:{brent:103.54,brent_chg:0.9,vix:22,security:false,quake:6.1,tsunami:false},
+  quakes:[{mag:5.2,place:"112 km SSW of Taitung, Taiwan",mins:48,tsunami:0,url:"#"}],
+  news:{hz:[{title:"Strait remains a flashpoint; tanker traffic disrupted",src:"seed",date:new Date().toISOString(),link:"#"}],
+    wire:[{title:"Oil swings on Hormuz headlines",src:"seed",date:new Date().toISOString(),link:"#"}],
+    gov:{incident:null,wh:null,dod:null}}
+};
+
+/* ========== RENDER ========== */
+let DATA=SEED;
+function renderTaiwan(tw){
+  const el=document.getElementById("twBody");
+  if(!tw||!tw.taiex){el.innerHTML='<div class="err">Taiwan data unavailable.</div>';return;}
+  const t=tw.taiex;
+  const stkDates=(tw.stocks||[]).map(s=>s.date).filter(Boolean).sort();
+  const newest=stkDates.length?stkDates[stkDates.length-1]:"";
+  const delayed=newest&&t.date&&t.date<newest;
+  const dateHtml=(t.date||"")+(delayed?`<span class="delaytag" title="Index source lags; individual stocks updated to ${newest}">指數延遲 · 個股至 ${newest}</span>`:"");
+  let html=`<div class="taiex">
+    <div><div class="nm">加權指數 TAIEX · ${dateHtml}</div><div class="big">${t.close.toLocaleString()}</div></div>
+    <div class="chg ${chgCls(t.chg_pct)}">${chgTxt(t.chg_pct)}</div>
+    <div class="sp" style="width:120px">${spark(t.spark,120,38,t.chg_pct)}</div></div>`;
+  html+=`<div class="stk">`+ (tw.stocks||[]).map(s=>`
+    <div class="scard"><span class="tagdot tag-${s.tag}"></span>
+      <div class="top"><span class="nm">${esc(s.name)}</span></div><span class="id">${s.id}</span>
+      <div class="pr">${s.close.toLocaleString()}</div>
+      <div class="ch ${chgCls(s.chg_pct)}">${chgTxt(s.chg_pct)}</div>
+      <div class="spwrap">${spark(s.spark,120,26,s.chg_pct)}</div></div>`).join("")+`</div>`;
+  el.innerHTML=html;
+}
+function renderMarkets(mk){
+  document.getElementById("chips").innerHTML=(mk||[]).map(c=>`
+    <div class="chip"><div class="n">${c.n}</div><div class="p">${c.p}</div>
+    <div class="c ${c.d}">${c.c}</div><div class="spwrap">${spark(c.spark,90,20, c.d==='up'?1:c.d==='dn'?-1:0)}</div></div>`).join("");
+  document.getElementById("mktImpBody").innerHTML=`<p>${marketRead(DATA.signals)}</p>`;
+}
+function feedHTML(items){return (items||[]).map((x,i)=>`<div class="item ${i===0?'hi':i<2?'md':'lo'}">
+  <div class="h">${esc(x.title)}</div><div class="b">${esc(x.src)||"news"} · ${ago(x.date)}</div>
+  <div class="src"><a href="${esc(x.link)}" target="_blank" rel="noopener">read ↗</a></div></div>`).join("");}
+function renderHz(news,sig){
+  document.getElementById("hzFeed").innerHTML=feedHTML(news.hz)||'<div class="err">No headlines.</div>';
+  document.getElementById("hzImpBody").innerHTML=`<p>${hzRead(sig)}</p>`;
+}
+function renderWire(news){
+  document.getElementById("wireFeed").innerHTML=feedHTML(news.wire)||'<div class="err">No headlines.</div>';
+  const tk=(news.wire||[]).slice(0,6).map(x=>`<b>${esc((x.src||"").toUpperCase())}</b> ${esc(x.title)}`);
+  if(tk.length){const s=tk.join("")===""?"":tk.map(x=>`<span>${x}</span>`).join("");document.getElementById("tkTrack").innerHTML=s+s;}
+}
+function renderGov(news,sig){
+  const g=news.gov||{}, rows=[];
+  if(g.incident && sig.security) rows.push({name:"⚠ SECURITY ALERT",status:"LIVE",note:esc(g.incident.title).slice(0,100)+" · "+ago(g.incident.date),url:g.incident.link||"#"});
+  rows.push({name:"White House",status:g.wh?"SOON":"OFF",note:g.wh?esc(g.wh.title).slice(0,90)+" · "+ago(g.wh.date):"no recent WH news",url:"https://www.whitehouse.gov/live/"});
+  rows.push({name:"Pentagon / War Dept",status:g.dod?"SOON":"OFF",note:g.dod?esc(g.dod.title).slice(0,90)+" · "+ago(g.dod.date):"no recent Pentagon news",url:"https://www.war.gov/News/Live-Events/"});
+  const abcSt=(DATA&&DATA.channels&&DATA.channels["ABCNews"])||"unknown";
+  const abcMap={live:"LIVE",soon:"SOON",off:"OFF",unknown:"LIVE"};
+  rows.push({name:"ABC News 24/7",status:abcMap[abcSt],
+    note:abcSt==="off"?"Stream currently offline (verified).":abcSt==="unknown"?"Continuous stream — status unverified (run start.bat to verify).":"Continuous stream — carries WH & Pentagon briefings as they air.",
+    url:"https://www.youtube.com/@ABCNews/live"});
+  const cls={LIVE:"st-live",SOON:"st-soon",OFF:"st-off"},col={LIVE:"var(--red)",SOON:"var(--amber)",OFF:"var(--faint)"};
+  document.getElementById("govBody").innerHTML=rows.map(r=>`<div class="gov-row">
+    <span class="gled ${r.status==='LIVE'?'blink':''}" style="background:${col[r.status]};box-shadow:var(--glow) ${col[r.status]}"></span>
+    <span class="nm">${r.name}</span><span class="st ${cls[r.status]}">${r.status==='LIVE'?'● LIVE':r.status==='SOON'?'◷ SCHED':'○ OFF-AIR'}</span>
+    <span class="nt">${r.note}</span><a class="go" href="${r.url}" target="_blank" rel="noopener">watch ↗</a></div>`).join("");
+}
+function magClass(m){return m>=6?"qm-hi":m>=4.5?"qm-md":"qm-lo";}
+let quakeMinMag=4.5;
+function renderQuakes(list){
+  const el=document.getElementById("quakeFeed");
+  const f=(list||[]).filter(q=>q.mag>=quakeMinMag).slice(0,6);
+  if(!f.length){el.innerHTML='<div class="qt" style="padding:8px 0;color:var(--faint)">No quakes above threshold in last 24h.</div>';return;}
+  el.innerHTML=f.map(q=>{const when=q.mins!=null?(q.mins<60?q.mins+"m ago":Math.round(q.mins/60)+"h ago"):"";
+    return `<a class="quake" href="${q.url}" target="_blank" rel="noopener"><span class="qm ${magClass(q.mag)}">${q.mag.toFixed(1)}</span>
+    <span class="qx"><div class="qp">${esc(q.place)}</div><div class="qt">${when}</div></span>
+    ${q.tsunami?'<span class="qbadge tsunami">🌊 TSUNAMI</span>':''}</a>`;}).join("");
+}
+document.querySelectorAll(".qmag").forEach(b=>b.addEventListener("click",function(){
+  document.querySelectorAll(".qmag").forEach(x=>x.classList.remove("act"));this.classList.add("act");
+  quakeMinMag=parseFloat(this.dataset.m);renderQuakes(DATA.quakes);}));
+
+/* ========== ANALYST READS (computed from signals) ========== */
+function hzRead(s){
+  const ob=s.brent_chg||0;
+  if(ob>=3) return `Brent +${ob.toFixed(1)}% — chokepoint premium building. Risk-OFF for import-heavy TWSE; watch shippers (2603), airlines (2618), petrochem (1301). Any tanker-incident headline gaps oil higher.`;
+  if(ob<=-3) return `Brent ${ob.toFixed(1)}% — de-escalation relief flowing through. Mild risk-ON for importers; fade vol spikes unless a fresh incident hits the wire.`;
+  return `Headline risk is binary and fast. A credible reopening deal is risk-ON (oil down, equities up); a talks-collapse or tanker incident spikes Brent and pressures TWSE/Nikkei/KOSPI. Watch transit counts + toll/uranium language.`;
+}
+function marketRead(s){
+  const ob=s.brent_chg||0,vix=s.vix||0,bits=[];
+  if(Math.abs(ob)>=2) bits.push(`Oil ${ob>0?"+":""}${ob.toFixed(1)}% — ${ob>0?"margin/inflation hit for Taiwan importers; refiners & shippers diverge from broad index":"relief for importers, mild tailwind for semis"}`);
+  if(vix>=20) bits.push(`VIX ${vix.toFixed(1)} elevated — hedge premium rich, favor spreads over naked longs`);
+  if(s.security) bits.push("US security headline live — expect gap risk on Taiwan open, keep size light");
+  if(s.tsunami||(s.quake||0)>=6.5) bits.push("Major seismic event — check TSMC/fab-region exposure before adding semis risk");
+  if(!bits.length) bits.push("Signals benign — range-bound bias; semis lead the tape, keep a Hormuz tail hedge on");
+  return bits.join(". ")+".";
+}
+
+/* ========== THREAT MODEL ========== */
+const LV=[{name:"LOW",col:"--green"},{name:"GUARDED",col:"--cyan"},{name:"ELEVATED",col:"--amber"},{name:"HIGH",col:"--red"},{name:"SEVERE",col:"--red"}];
+let lastThreat=2;
+function computeThreat(s){let k=1;const ob=Math.abs(s.brent_chg||0);
+  if(ob>=5)k+=2;else if(ob>=2)k+=1;
+  if(s.vix!=null){if(s.vix>=30)k+=2;else if(s.vix>=20)k+=1;}
+  if(s.security)k+=1;
+  if(s.tsunami)k+=2;else if((s.quake||0)>=7)k+=2;else if((s.quake||0)>=6.5)k+=1;
+  return Math.max(0,Math.min(4,k));}
+function applyThreat(s){
+  const k=computeThreat(s),lv=LV[k];
+  const el=document.getElementById("threatLvl"),led=document.getElementById("threatLed"),lab=document.getElementById("threatLab");
+  el.textContent=lv.name;el.style.color=`var(${lv.col})`;led.style.background=`var(${lv.col})`;led.style.boxShadow=`var(--glow) var(${lv.col})`;
+  lab.textContent=s.security?"SECURITY + HORMUZ":"HORMUZ / GLOBAL";
+  if(alertsOn&&k>lastThreat&&k>=3) fireAlert("THREAT ↑ "+lv.name,`Oil ${(s.brent_chg||0).toFixed(1)}% · VIX ${s.vix??"—"}${s.security?" · security incident":""}`);
+  lastThreat=k;
+}
+
+/* ========== ALERTS ========== */
+let alertsOn=false,audioCtx=null;
+function beep(){try{audioCtx=audioCtx||new (window.AudioContext||window.webkitAudioContext)();const t=audioCtx.currentTime;
+  [880,1320,990].forEach((f,i)=>{const o=audioCtx.createOscillator(),g=audioCtx.createGain();o.type="square";o.frequency.value=f;
+    o.connect(g);g.connect(audioCtx.destination);const st=t+i*0.18;g.gain.setValueAtTime(0.0001,st);
+    g.gain.exponentialRampToValueAtTime(0.25,st+0.02);g.gain.exponentialRampToValueAtTime(0.0001,st+0.16);o.start(st);o.stop(st+0.17);});}catch(_){}}
+function fireAlert(title,body){beep();const box=document.getElementById("threatBox");
+  box.style.transition="box-shadow .2s";box.style.boxShadow="0 0 0 2px var(--red), var(--glow) var(--red)";setTimeout(()=>box.style.boxShadow="",1600);
+  if(window.Notification&&Notification.permission==="granted"){try{new Notification("🛑 "+title,{body,tag:"gsr"});}catch(_){}}}
+document.getElementById("alertBtn").onclick=function(){alertsOn=!alertsOn;this.textContent="🔔 ALERTS: "+(alertsOn?"ON":"OFF");this.classList.toggle("act",alertsOn);
+  if(alertsOn){try{audioCtx=audioCtx||new (window.AudioContext||window.webkitAudioContext)();audioCtx.resume();}catch(_){}
+    if(window.Notification&&Notification.permission==="default")Notification.requestPermission();beep();}};
+
+/* ========== SCAN → SNAPSHOT ========== */
+function tpeStamp(){return new Intl.DateTimeFormat("sv-SE",{timeZone:"Asia/Taipei",year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit"}).format(new Date()).replace(" ","_").replace(":","");}
+function snapshotText(){
+  const s=DATA.signals,tw=DATA.taiwan,L=[];
+  L.push("════════════════════════════════════════");L.push("  GLOBAL SITUATION ROOM — SCAN");L.push("  "+DATA.generated_tpe);L.push("════════════════════════════════════════\n");
+  L.push("THREAT: "+LV[computeThreat(s)].name);
+  L.push(`  Brent ${s.brent??"—"} (${(s.brent_chg||0).toFixed(1)}%) · VIX ${s.vix??"—"} · top quake M${s.quake??"—"}${s.tsunami?" · TSUNAMI":""}${s.security?" · SECURITY":""}\n`);
+  L.push("── TAIWAN ──");
+  if(tw.taiex)L.push(`  TAIEX ${tw.taiex.close} (${tw.taiex.chg_pct>0?"+":""}${tw.taiex.chg_pct}%)`);
+  (tw.stocks||[]).forEach(x=>L.push(`  ${x.id} ${x.name}  ${x.close}  ${x.chg_pct>0?"+":""}${x.chg_pct}%`));
+  L.push("\n── MARKETS ──");DATA.markets.forEach(m=>L.push(`  ${m.n.padEnd(10)} ${String(m.p).padEnd(10)} ${m.c}`));
+  L.push("\n── IRAN / HORMUZ ──");(DATA.news.hz||[]).forEach(h=>L.push(`  • ${h.title} (${h.src}, ${ago(h.date)})`));
+  L.push("\n── GLOBAL WIRE ──");(DATA.news.wire||[]).forEach(h=>L.push(`  • ${h.title} (${h.src}, ${ago(h.date)})`));
+  L.push("\n── EARTHQUAKES ──");(DATA.quakes||[]).slice(0,5).forEach(q=>L.push(`  M${q.mag} ${q.place}${q.tsunami?" ⚠TSUNAMI":""}`));
+  L.push("\n── ACTION · TAIWAN OPTIONS (加權指數) ──");L.push("  "+marketRead(s));
+  L.push("\n(auto-generated · verify before acting on positions)");
+  return L.join("\n");
+}
+function downloadFile(name,text,mime){const blob=new Blob([text],{type:mime||"text/plain"});const a=document.createElement("a");
+  a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},1000);}
+document.getElementById("scanBtn").onclick=function(){const base="situation_"+tpeStamp();
+  downloadFile(base+".txt",snapshotText(),"text/plain");
+  downloadFile(base+".json",JSON.stringify(DATA,null,2),"application/json");
+  const el=document.getElementById("scanStatus");el.textContent="✓ saved "+base+".txt + .json";el.style.color="var(--green)";};
+
+/* ========== DATA LOADING (from local backend) ========== */
+function setStamp(id,epoch){const el=document.getElementById(id);if(!el)return;
+  const t=new Intl.DateTimeFormat("en-GB",{hour:"2-digit",minute:"2-digit",timeZone:"Asia/Taipei"}).format(new Date(epoch||Date.now()));
+  el.textContent="↻ "+t+" TPE";}
+function applyData(d){
+  DATA=d;
+  renderTaiwan(d.taiwan);renderMarkets(d.markets);renderHz(d.news,d.signals);renderWire(d.news);renderGov(d.news,d.signals);renderQuakes(d.quakes);renderChannels();
+  applyThreat(d.signals);
+  const ep=d.generated_epoch||0;
+  ["twStamp","mktStamp","hzStamp","wireStamp","govStamp","quakeStamp"].forEach(id=>setStamp(id,ep));
+}
+function updateAge(){
+  const pill=document.getElementById("dataPill"),age=document.getElementById("dataAge");
+  if(!DATA.generated_epoch){age.textContent="SEED";pill.classList.add("stale");return;}
+  const mins=Math.round((Date.now()-DATA.generated_epoch)/60000);
+  age.textContent=mins<1?"LIVE · <1m":mins+"m old";
+  pill.classList.toggle("stale",mins>15);
+}
+setInterval(updateAge,15000);
+async function loadData(){
+  try{
+    const r=await fetch("data.json?t="+Date.now(),{cache:"no-store"});
+    if(!r.ok) throw new Error("HTTP "+r.status);
+    const d=await r.json();
+    document.getElementById("backendBanner").style.display="none";
+    applyData(d);updateAge();
+    return true;
+  }catch(e){
+    // backend not running / opened as file:// — use last saved data.js if present, else seed
+    var banner=document.getElementById("backendBanner");
+    if(window.GSR_DATA){
+      applyData(window.GSR_DATA);
+      banner.innerHTML="<b>📄 Showing last saved snapshot</b> (data.js, "+(window.GSR_DATA.generated_tpe||"")+"). For live auto-refresh, launch <code>start.bat</code> and open <code>localhost:8800</code>.";
+    }else{
+      if(DATA===SEED || !DATA.generated_epoch){applyData(SEED);}
+      banner.innerHTML="<b>&#9888; Backend not detected.</b> Showing placeholder seed data. Double-click <code>start.bat</code> to go live.";
+    }
+    banner.style.display="block";
+    updateAge();
+    return false;
+  }
+}
+document.getElementById("refreshAll").onclick=loadData;
+/* per-panel refresh buttons — all share the single data.json fetch */
+document.querySelectorAll(".prefresh").forEach(b=>b.addEventListener("click",async function(e){
+  e.preventDefault();e.stopPropagation();
+  this.classList.add("spin");await loadData();
+  setTimeout(()=>this.classList.remove("spin"),700);
+}));
+let auto=null;
+document.getElementById("autoBtn").onclick=function(){
+  if(auto){clearInterval(auto);auto=null;this.textContent="AUTO-REFRESH: OFF";this.classList.remove("act");}
+  else{this.textContent="AUTO-REFRESH: ON";this.classList.add("act");loadData();auto=setInterval(loadData,60000);}
+};
+
+/* WAR ROOM fullscreen */
+document.getElementById("warRoomBtn").onclick=function(){const el=document.documentElement;
+  if(!document.fullscreenElement){(el.requestFullscreen||el.webkitRequestFullscreen||function(){}).call(el);this.textContent="⛶ EXIT WAR ROOM";
+    if(!auto)document.getElementById("autoBtn").click();}
+  else{(document.exitFullscreen||document.webkitExitFullscreen||function(){}).call(document);this.textContent="⛶ WAR ROOM";}};
+document.addEventListener("fullscreenchange",()=>{if(!document.fullscreenElement)document.getElementById("warRoomBtn").textContent="⛶ WAR ROOM";});
+
+/* INIT */
+applyData(SEED);
+loadData();
+setInterval(loadData, 60000);  // keep page in sync with backend refreshes
+</script>
+</body>
+</html>
