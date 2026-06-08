@@ -115,35 +115,77 @@ def fetch_taiex_twse():
     return {"close": round(last, 2), "chg_pct": round(chg, 2),
             "spark": [round(x, 2) for x in closes[-12:]], "date": dates[-1], "source": "TWSE"}
 
+def yahoo_series(sym):
+    """Daily series from Yahoo Finance for an index or stock. Returns
+    dict(close, chg_pct, spark, date) from the latest (live) bar, or None.
+    ^TWII is the TAIEX price index (發行量加權股價指數) — matches TradingView/brokers."""
+    url = ("https://query1.finance.yahoo.com/v8/finance/chart/"
+           + urllib.parse.quote(sym) + "?range=2mo&interval=1d")
+    j = json.loads(http_get(url, 15))
+    r = j["chart"]["result"][0]
+    ts = r.get("timestamp", []) or []
+    cl = r["indicators"]["quote"][0]["close"]
+    pairs = [(t, c) for t, c in zip(ts, cl) if c is not None]
+    if len(pairs) < 2:
+        return None
+    closes = [c for _, c in pairs]
+    last, prev = closes[-1], closes[-2]
+    chg = (last - prev) / prev * 100 if prev else 0
+    tpe = datetime.timezone(datetime.timedelta(hours=8))
+    d = datetime.datetime.fromtimestamp(pairs[-1][0], tz=datetime.timezone.utc).astimezone(tpe).strftime("%Y-%m-%d")
+    return {"close": round(last, 2), "chg_pct": round(chg, 2),
+            "spark": [round(c, 2) for c in closes[-12:]], "date": d}
+
 def fetch_taiwan():
     out = {"taiex": None, "stocks": [], "error": None}
+    # --- TAIEX index: Yahoo ^TWII (live price index, matches the live chart) -> TWSE -> FinMind ---
     try:
-        rows = finmind("TaiwanStockPrice", "TAIEX")
-        s = series_from_rows(rows)
+        s = yahoo_series("^TWII")
         if s:
-            last, prev, chg, spark, date = s
-            out["taiex"] = {"close": round(last, 2), "chg_pct": round(chg, 2),
-                            "spark": [round(x, 2) for x in spark], "date": date, "source": "FinMind"}
+            s["source"] = "Yahoo"
+            out["taiex"] = s
     except Exception as e:
-        out["error"] = str(e)[:120]
-    # Prefer official TWSE index when it is at least as fresh as FinMind (fixes index-date lag)
-    try:
-        twse = fetch_taiex_twse()
-        if twse and (not out["taiex"] or twse["date"] >= out["taiex"].get("date", "")):
-            out["taiex"] = twse
-    except Exception:
-        pass
-    for sid, name, tag in TW_BASKET:
+        out["error"] = ("twii:" + str(e))[:110]
+    if not out["taiex"]:
         try:
-            rows = finmind("TaiwanStockPrice", sid)
-            s = series_from_rows(rows)
-            if s:
-                last, prev, chg, spark, date = s
-                out["stocks"].append({"id": sid, "name": name, "tag": tag,
-                                      "close": round(last, 2), "chg_pct": round(chg, 2),
-                                      "spark": [round(x, 2) for x in spark], "date": date})
+            twse = fetch_taiex_twse()
+            if twse:
+                out["taiex"] = twse
         except Exception:
             pass
+    if not out["taiex"]:
+        try:
+            rows = finmind("TaiwanStockPrice", "TAIEX")
+            r = series_from_rows(rows)
+            if r:
+                last, prev, chg, spark, date = r
+                out["taiex"] = {"close": round(last, 2), "chg_pct": round(chg, 2),
+                                "spark": [round(x, 2) for x in spark], "date": date, "source": "FinMind"}
+        except Exception:
+            pass
+    # --- basket stocks: Yahoo (id.TW) live -> FinMind fallback ---
+    for sid, name, tag in TW_BASKET:
+        st, src = None, None
+        try:
+            st = yahoo_series(sid + ".TW")
+            if st:
+                src = "Yahoo"
+        except Exception:
+            st = None
+        if not st:
+            try:
+                rows = finmind("TaiwanStockPrice", sid)
+                r = series_from_rows(rows)
+                if r:
+                    last, prev, chg, spark, date = r
+                    st = {"close": round(last, 2), "chg_pct": round(chg, 2),
+                          "spark": [round(x, 2) for x in spark], "date": date}
+                    src = "FinMind"
+            except Exception:
+                st = None
+        if st:
+            st.update({"id": sid, "name": name, "tag": tag, "source": src})
+            out["stocks"].append(st)
     return out
 
 # ============================================================
