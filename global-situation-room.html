@@ -20,7 +20,7 @@
   *{box-sizing:border-box;-webkit-tap-highlight-color:rgba(56,225,255,.18)}
   html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
   html,body{margin:0;height:100%}
-  body{-webkit-overflow-scrolling:touch}
+  body{-webkit-overflow-scrolling:touch;overflow-x:hidden}
   body{
     background:
       radial-gradient(1200px 700px at 80% -10%, #0d1a22 0%, transparent 60%),
@@ -53,6 +53,22 @@
     .clk{min-width:96px;padding:7px 10px}
     .quake{padding:11px 0}
     .gov-row{padding:11px 4px}
+  }
+  /* ---- phones (≤600px): compact header, scrollable clocks, no horizontal scroll ---- */
+  @media(max-width:600px){
+    header{gap:10px;padding:10px 12px}
+    .brand{min-width:0;flex:1 1 100%} .brand h1{font-size:18px}
+    .brand .sub{font-size:9px;letter-spacing:.14em}
+    .clocks{margin-left:0;width:100%;order:5;flex-wrap:nowrap;overflow-x:auto;
+      -webkit-overflow-scrolling:touch;scrollbar-width:none}
+    .clocks::-webkit-scrollbar{display:none}
+    .clk{flex:0 0 auto;min-width:72px}
+    .threat,.datapill{flex:0 0 auto}
+    .warbtn{padding:8px 10px;font-size:11px}
+    .taiex{flex-wrap:wrap;gap:8px 12px}
+    .taiex .sp{flex:1 1 100%;width:auto!important}
+    .gov-row{flex-wrap:wrap;gap:4px 8px} .gov-row .nt{flex:1 1 100%}
+    img,svg,iframe{max-width:100%}
   }
   /* ---- very narrow (foldable cover screen, small phones) ---- */
   @media(max-width:380px){
