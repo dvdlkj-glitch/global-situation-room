@@ -234,6 +234,30 @@
   .idxwrap .clab{font-size:9px;letter-spacing:.1em;color:var(--dim);padding:5px 8px;border-bottom:1px solid var(--line)}
   .idxwrap iframe{width:100%;height:190px;border:0;display:block}
 
+  /* ---- CPI lie-detector panel ---- */
+  .cpiverd{border:1px solid var(--line2);border-left-width:3px;border-radius:8px;padding:9px 11px;background:#0a0e14;margin-bottom:10px}
+  .cpiverd .vk{font-family:"Chakra Petch";font-weight:700;font-size:16px;letter-spacing:.04em}
+  .cpiverd .vn{font-size:10.5px;color:var(--dim);margin-top:3px;line-height:1.55}
+  .cpigrid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px}
+  .cpicard{border:1px solid var(--line2);border-radius:8px;padding:8px 9px;background:#080d11}
+  .cpicard .cn{font-size:9.5px;color:var(--dim);letter-spacing:.08em}
+  .cpicard .cv{font-family:"Chakra Petch";font-weight:700;font-size:18px;color:#eaf6fb;margin-top:2px}
+  .cpicard .cc{font-size:11px;font-weight:600;margin-top:1px}
+  .cpicard .spwrap{margin-top:4px;height:24px}
+  .cpinext{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 10px;border:1px dashed var(--line2);border-radius:8px;background:#0c0a14;margin-bottom:10px}
+  .cpinext .nl{font-size:10.5px;color:var(--violet);font-weight:600;letter-spacing:.06em}
+  .cpinext .nt{font-size:11px;color:var(--txt)}
+  .cpinext .nc{margin-left:auto;font-family:"Chakra Petch";font-weight:700;font-size:13px;color:var(--green)}
+  .cpitable{font-size:10px;border:1px solid var(--line);border-radius:8px;overflow:hidden;margin-bottom:8px}
+  .cpitable .ch,.cpitable .rw{display:grid;grid-template-columns:1.05fr 1.4fr 1.4fr;gap:6px;padding:6px 8px;border-bottom:1px solid var(--line)}
+  .cpitable .rw:last-child{border-bottom:0}
+  .cpitable .ch{background:#0a1014;color:var(--dim);font-weight:600}
+  .cpitable .rk{color:var(--faint)}
+  .cpitable .tr{color:#ffb9c1} .cpitable .tf{color:#9fe9c9}
+  .cpiplay{font-size:10px;color:var(--dim);line-height:1.65;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:#080d11}
+  .cpiplay b{color:var(--cyan)}
+  .cpiquote{font-size:10.5px;color:var(--violet);text-align:center;margin-top:7px;font-style:italic}
+
   .qctl{display:flex;align-items:center;gap:6px;margin-bottom:9px}
   .qmag{font-size:10px;padding:3px 9px}
   .quake{display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--line)}
@@ -385,19 +409,11 @@
         <div class="pbody"><div class="feed" id="wireFeed"></div></div>
       </div>
 
-      <div class="panel">
-        <div class="phead"><span class="dot" style="background:var(--green);box-shadow:var(--glow) var(--green)"></span>
-          <h2>Live Charts · TAIEX / ES / SOX / VIX</h2><div class="meta"><span>TradingView</span></div></div>
-        <div class="pbody"><div class="idxtape">
-          <div class="idxwrap" style="grid-column:1 / -1"><div class="clab" style="color:var(--green)">加權指數 · TAIEX (TWSE:IX0001)</div>
-            <iframe title="TAIEX" loading="lazy" src="https://s.tradingview.com/widgetembed/?symbol=TWSE%3AIX0001&interval=60&theme=dark&style=1&locale=en&hideideas=1&hidesidetoolbar=1&saveimage=0&withdateranges=0&hidetoptoolbar=1"></iframe></div>
-          <div class="idxwrap"><div class="clab">S&amp;P 500 FUT · ES</div>
-            <iframe title="ES" loading="lazy" src="https://s.tradingview.com/widgetembed/?symbol=CME_MINI%3AES1!&interval=60&theme=dark&style=1&locale=en&hideideas=1&hidesidetoolbar=1&saveimage=0&hidetoptoolbar=1"></iframe></div>
-          <div class="idxwrap"><div class="clab">SOX · SEMIS</div>
-            <iframe title="SOX" loading="lazy" src="https://s.tradingview.com/widgetembed/?symbol=NASDAQ%3ASOX&interval=60&theme=dark&style=1&locale=en&hideideas=1&hidesidetoolbar=1&saveimage=0&hidetoptoolbar=1"></iframe></div>
-          <div class="idxwrap"><div class="clab" style="color:var(--red)">VIX · FEAR</div>
-            <iframe title="VIX" loading="lazy" src="https://s.tradingview.com/widgetembed/?symbol=CBOE%3AVIX&interval=60&theme=dark&style=1&locale=en&hideideas=1&hidesidetoolbar=1&saveimage=0&hidetoptoolbar=1"></iframe></div>
-        </div></div>
+      <div class="panel" style="border-color:#3a2a5a">
+        <div class="phead" style="background:#0c0a14"><span class="dot blink" style="background:var(--violet);box-shadow:var(--glow) var(--violet)"></span>
+          <h2 style="color:#d9ccff">📉 CPI 照妖鏡 · Real-vs-Fake Selloff</h2>
+          <div class="meta"><span id="cpiStamp">--</span><button class="prefresh" title="Refresh now">⟳</button></div></div>
+        <div class="pbody"><div id="cpiBody"></div></div>
       </div>
 
       <div class="panel">
@@ -470,6 +486,79 @@ function renderChannels(){
     if(!cs){stamp.textContent="status unverified";stamp.style.color="var(--faint)";}
     else{const n=Object.values(cs).filter(v=>v==="live").length;stamp.textContent=n+" live now";stamp.style.color=n?"var(--red)":"var(--dim)";}}
 }
+
+/* ========== CPI LIE-DETECTOR (US10Y + DXY → 真跌/假跌) ========== */
+const CPI_DATES=[["May 2026","2026-06-10T12:30:00+00:00"],["Jun 2026","2026-07-14T12:30:00+00:00"],
+  ["Jul 2026","2026-08-12T12:30:00+00:00"],["Aug 2026","2026-09-11T12:30:00+00:00"],
+  ["Sep 2026","2026-10-14T12:30:00+00:00"],["Oct 2026","2026-11-10T13:30:00+00:00"],
+  ["Nov 2026","2026-12-10T13:30:00+00:00"]];
+function nextCPI(){const cut=Date.now()-36e5;
+  for(const [label,iso] of CPI_DATES){const d=new Date(iso);
+    if(d-cut>=0){const p=new Intl.DateTimeFormat("en-US",{timeZone:"Asia/Taipei",month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit",hour12:false}).formatToParts(d);
+      const g=t=>(p.find(x=>x.type===t)||{}).value;return{label,iso,tpe:`${g("month")}/${g("day")} ${g("hour")}:${g("minute")}`};}}
+  return null;}
+function cpiVerdict(c){
+  if(!c||!c.us10y||!c.dxy) return {k:"na",label:"— 資料待載入",col:"--dim",
+    note:"執行 start.bat 後載入 US 10Y 殖利率與美元指數 (DXY) 即時反應。"};
+  const bps=c.us10y.chg_bps||0, dxy=c.dxy.chg_pct||0, spx=(c.spx_chg==null?0:c.spx_chg);
+  if(bps>=5 && dxy>=0.3) return {k:"real",label:"真跌 · RISK-OFF",col:"--red",
+    note:"殖利率飆升 + 美元噴出 → 利率/通膨定價殺傷，屬實質下跌，風險資產全面失血。"};
+  if(spx<0 && bps<=1 && dxy<=0.1) return {k:"fake",label:"假跌 · SHAKEOUT",col:"--green",
+    note:"股跌但債市/匯市冷靜甚至走弱 → 缺乏資金面支持，多為程式／散戶恐慌的誘空，留意開低走高。"};
+  return {k:"neutral",label:"中性 · 觀望",col:"--amber",
+    note:"訊號尚未對齊。CPI 公佈瞬間看 US10Y 與 DXY 是否「同步垂直噴出」再下定論。"};
+}
+function renderCPI(d){
+  const el=document.getElementById("cpiBody"); if(!el) return;
+  const c=d.cpi||null, v=cpiVerdict(c);
+  let h=`<div class="cpiverd" style="border-left-color:var(${v.col})"><div class="vk" style="color:var(${v.col})">${v.label}</div><div class="vn">${v.note}</div></div>`;
+  if(c && (c.us10y||c.dxy)){
+    h+=`<div class="cpigrid">`;
+    if(c.us10y){const up=(c.us10y.chg_bps||0)>0;
+      h+=`<div class="cpicard"><div class="cn">US 10Y 殖利率 (定價之錨)</div>
+        <div class="cv">${c.us10y.value.toFixed(2)}%</div>
+        <div class="cc ${up?'dn':'up'}">${up?'▲ +':'▼ '}${c.us10y.chg_bps} bps</div>
+        <div class="spwrap">${spark(c.us10y.spark,120,24,up?-1:1)}</div></div>`;}
+    if(c.dxy){const up=(c.dxy.chg_pct||0)>0;
+      h+=`<div class="cpicard"><div class="cn">美元指數 DXY (流動性)</div>
+        <div class="cv">${c.dxy.value.toFixed(2)}</div>
+        <div class="cc ${up?'dn':'up'}">${up?'▲ +':'▼ '}${c.dxy.chg_pct.toFixed(2)}%</div>
+        <div class="spwrap">${spark(c.dxy.spark,120,24,up?-1:1)}</div></div>`;}
+    h+=`</div>`;
+  } else {
+    h+=`<div class="err">US10Y / DXY 待後端載入（執行 start.bat、開 localhost:8800 後顯示）。</div>`;
+  }
+  const nx=(c && c.next) || nextCPI();
+  if(nx){
+    h+=`<div class="cpinext"><span class="nl">下次 CPI · ${esc(nx.label)}</span>
+      <span class="nt">${esc(nx.tpe)} TPE</span>
+      <span class="nc" id="cpiCountdown" data-iso="${esc(nx.iso)}">--</span></div>`;
+  }
+  h+=`<div class="cpitable">
+    <div class="ch"><span></span><span class="tr">真跌 📉</span><span class="tf">假跌／洗盤 🔄</span></div>
+    <div class="rw"><span class="rk">10Y 殖利率</span><span class="tr">飆升 +5~10 bps</span><span class="tf">持平、甚至不升反跌</span></div>
+    <div class="rw"><span class="rk">美元 DXY</span><span class="tr">強勢長紅噴出</span><span class="tf">衝高留長上影／走弱</span></div>
+    <div class="rw"><span class="rk">本質</span><span class="tr">通膨超預期 · Higher for longer</span><span class="tf">核心降溫／主力洗盤</span></div></div>`;
+  h+=`<div class="cpiplay"><b>實戰 3 步</b>　① 公布瞬間 (20:30/21:30 TPE) 先看 US10Y + DXY 的 1 分K 是否同步垂直噴出　② 美股開盤 30 分後若指數續低、但兩者停漲或拐頭向下 ＝ 假跌背離　③ 隔天台股若開低且外資未撤 ＝ 基本面加碼點</div>
+    <div class="cpiquote">「股市會說謊，但債市和匯市往往很誠實。」</div>
+    <div style="margin-top:6px">
+      <a class="lview" href="https://www.tradingview.com/symbols/TVC-US10Y/" target="_blank" rel="noopener">📈 US10Y 即時</a>
+      <a class="lview" href="https://www.tradingview.com/symbols/TVC-DXY/" target="_blank" rel="noopener">💵 DXY 即時</a>
+      <a class="lview" href="https://www.tradingview.com/symbols/CME_MINI-ES1!/" target="_blank" rel="noopener">📉 S&amp;P 期貨 ES</a></div>`;
+  el.innerHTML=h; tickCPI();
+}
+function tickCPI(){
+  const el=document.getElementById("cpiCountdown"); if(!el) return;
+  const iso=el.dataset.iso; if(!iso) return;
+  let diff=new Date(iso)-Date.now();
+  if(diff<=0){el.textContent="🔴 LIVE / 已公布";el.style.color="var(--red)";return;}
+  const day=Math.floor(diff/864e5); diff-=day*864e5;
+  const hr=Math.floor(diff/36e5); diff-=hr*36e5;
+  const mn=Math.floor(diff/6e4);
+  el.textContent="倒數 "+(day>0?day+"天 ":"")+hr+"時"+mn+"分";
+  el.style.color=(day===0?"var(--amber)":"var(--green)");
+}
+setInterval(tickCPI,1000);
 
 /* ========== HELPERS ========== */
 function esc(s){return (s||"").replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
@@ -655,10 +744,10 @@ function setStamp(id,epoch){const el=document.getElementById(id);if(!el)return;
   el.textContent="↻ "+t+" TPE";}
 function applyData(d){
   DATA=d;
-  renderTaiwan(d.taiwan);renderMarkets(d.markets);renderHz(d.news,d.signals);renderWire(d.news);renderGov(d.news,d.signals);renderQuakes(d.quakes);renderChannels();
+  renderTaiwan(d.taiwan);renderMarkets(d.markets);renderHz(d.news,d.signals);renderWire(d.news);renderGov(d.news,d.signals);renderQuakes(d.quakes);renderChannels();renderCPI(d);
   applyThreat(d.signals);
   const ep=d.generated_epoch||0;
-  ["twStamp","mktStamp","hzStamp","wireStamp","govStamp","quakeStamp"].forEach(id=>setStamp(id,ep));
+  ["twStamp","mktStamp","hzStamp","wireStamp","govStamp","quakeStamp","cpiStamp"].forEach(id=>setStamp(id,ep));
 }
 function updateAge(){
   const pill=document.getElementById("dataPill"),age=document.getElementById("dataAge");

@@ -134,7 +134,8 @@ def yahoo_series(sym):
     tpe = datetime.timezone(datetime.timedelta(hours=8))
     d = datetime.datetime.fromtimestamp(pairs[-1][0], tz=datetime.timezone.utc).astimezone(tpe).strftime("%Y-%m-%d")
     return {"close": round(last, 2), "chg_pct": round(chg, 2),
-            "spark": [round(c, 2) for c in closes[-12:]], "date": d}
+            "spark": [round(c, 2) for c in closes[-12:]], "date": d,
+            "last": last, "prev": prev}
 
 def fetch_taiwan():
     out = {"taiex": None, "stocks": [], "error": None}
@@ -341,6 +342,61 @@ def fetch_channels():
     return out
 
 # ============================================================
+#  CPI lie-detector : US 10Y yield + DXY (smart-money reaction)
+# ============================================================
+# US CPI release calendar (BLS) — all 08:30 AM ET, stored as UTC ISO.
+# 08:30 EDT = 12:30Z (Mar–Oct); 08:30 EST = 13:30Z (Nov–Feb).
+CPI_SCHEDULE = [
+    ("May 2026",  "2026-06-10T12:30:00+00:00"),
+    ("Jun 2026",  "2026-07-14T12:30:00+00:00"),
+    ("Jul 2026",  "2026-08-12T12:30:00+00:00"),
+    ("Aug 2026",  "2026-09-11T12:30:00+00:00"),
+    ("Sep 2026",  "2026-10-14T12:30:00+00:00"),
+    ("Oct 2026",  "2026-11-10T13:30:00+00:00"),
+    ("Nov 2026",  "2026-12-10T13:30:00+00:00"),
+]
+
+def _yld_norm(v):
+    """Yahoo ^TNX is sometimes quoted x10 (43.0) and sometimes as percent (4.30)."""
+    return v / 10.0 if (v and v > 20) else v
+
+def fetch_cpi_watch():
+    cpi = {"us10y": None, "dxy": None, "next": None}
+    # US 10Y Treasury yield (^TNX) — the pricing anchor
+    try:
+        y = yahoo_series("^TNX")
+        if y:
+            last, prev = _yld_norm(y["last"]), _yld_norm(y["prev"])
+            cpi["us10y"] = {"value": round(last, 2),
+                            "chg_bps": round((last - prev) * 100),
+                            "spark": [round(_yld_norm(x), 2) for x in y["spark"]],
+                            "date": y["date"]}
+    except Exception:
+        pass
+    # US Dollar Index (DXY) — global liquidity gauge
+    for sym in ("DX-Y.NYB", "DX=F"):
+        try:
+            d = yahoo_series(sym)
+            if d:
+                chg = (d["last"] - d["prev"]) / d["prev"] * 100 if d["prev"] else 0
+                cpi["dxy"] = {"value": round(d["last"], 2), "chg_pct": round(chg, 2),
+                              "spark": d["spark"], "date": d["date"]}
+                break
+        except Exception:
+            continue
+    # next scheduled CPI release (keep showing through the release hour)
+    now = datetime.datetime.now(datetime.timezone.utc)
+    tpe = datetime.timezone(datetime.timedelta(hours=8))
+    for label, iso in CPI_SCHEDULE:
+        dt = datetime.datetime.fromisoformat(iso)
+        if dt >= now - datetime.timedelta(hours=1):
+            dt2 = dt.astimezone(tpe)
+            cpi["next"] = {"label": label, "iso": iso,
+                           "tpe": f"{dt2.month}/{dt2.day} {dt2.hour:02d}:{dt2.minute:02d}"}
+            break
+    return cpi
+
+# ============================================================
 #  Assemble
 # ============================================================
 def hours_since(date_str):
@@ -360,12 +416,23 @@ def build():
     quakes = fetch_quakes()
     news = fetch_news()
     channels = fetch_channels()
+    cpi = fetch_cpi_watch()
 
     top_q = quakes[0] if quakes else None
     sig["quake"] = top_q["mag"] if top_q else None
     sig["tsunami"] = bool(top_q["tsunami"]) if top_q else False
     g = news["gov"]
     sig["security"] = bool(g["incident"] and hours_since(g["incident"]["date"]) < 8)
+
+    # S&P 500 move (the selloff being judged by the CPI lie-detector)
+    def _pct(s):
+        try:
+            return float(str(s).replace("%", "").replace("+", ""))
+        except Exception:
+            return None
+    spx = next((m for m in markets if m.get("n") == "S&P 500"), None)
+    cpi["spx_chg"] = _pct(spx["c"]) if spx else None
+    cpi["vix"] = sig.get("vix")
 
     now = datetime.datetime.now(datetime.timezone.utc)
     tpe = now.astimezone(datetime.timezone(datetime.timedelta(hours=8)))
@@ -379,6 +446,7 @@ def build():
         "quakes": quakes,
         "news": news,
         "channels": channels,
+        "cpi": cpi,
         "refresh_min": REFRESH_MIN,
     }
 
